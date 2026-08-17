@@ -47,6 +47,16 @@ func (u *ui) ConfirmUninstall() (bool, error) {
 	return idx == 1, nil
 }
 
+func (u *ui) ConfirmAdopt(location string) (bool, error) {
+	question := "An existing Odin installation was found at:\n\n  " + location +
+		"\n\nAdopt it as the managed installation (moves it under /opt/odin) instead of downloading a new copy?"
+	idx, err := u.confirm(question, []string{"Cancel", "Adopt existing installation"})
+	if err != nil {
+		return false, err
+	}
+	return idx == 1, nil
+}
+
 // confirmRequestMsg is sent from the operation goroutine to ask the model to
 // show a selection prompt and return the chosen index.
 type confirmRequestMsg struct {

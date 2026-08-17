@@ -33,6 +33,7 @@ var (
 type UI interface {
 	ConfirmInstallDeps(missing []system.Dependency) (bool, error)
 	ConfirmUninstall() (bool, error)
+	ConfirmAdopt(location string) (bool, error)
 }
 
 // Installer coordinates every Odin installation operation. It performs all
@@ -83,6 +84,22 @@ func (in *Installer) Install(ctx context.Context) error {
 	}
 	if _, err := os.Lstat(paths.CurrentLink); err == nil {
 		return ErrAlreadyInstalled
+	}
+
+	// If an unmanaged Odin installation already exists and we can ask the
+	// user, offer to adopt it into the managed layout instead of downloading
+	// a fresh copy.
+	if in.UI != nil {
+		if srcDir := existingInstallDir(); srcDir != "" {
+			ok, err := in.UI.ConfirmAdopt(srcDir)
+			if err != nil {
+				return err
+			}
+			if ok {
+				in.step("Adopting existing installation")
+				return adoptExisting(in.Runner, srcDir)
+			}
+		}
 	}
 
 	in.step("Checking dependencies")
@@ -149,6 +166,91 @@ func (in *Installer) Update(ctx context.Context) error {
 	}
 	in.step("Downloading " + rel.TagName)
 	return in.installRelease(ctx, asset, installed)
+}
+
+// adoptExisting moves an unmanaged Odin installation on PATH into the managed
+// layout and activates it. /usr/local/bin/odin is only ever replaced when it
+// points at the adopted directory; anything else is refused.
+func adoptExisting(runner system.Runner, srcDir string) error {
+	version, err := validateInstall(runner, srcDir)
+	if err != nil {
+		return fmt.Errorf("cannot adopt existing installation: %w", err)
+	}
+	name, err := release.VersionDirName(version)
+	if err != nil {
+		name, err = release.VersionDirName(filepath.Base(srcDir))
+		if err != nil {
+			return fmt.Errorf("cannot adopt existing installation: %w", err)
+		}
+	}
+
+	// Decide whether /usr/local/bin/odin may be touched before the source
+	// directory moves and its link starts dangling.
+	managed, present, err := binLinkStatus()
+	if err != nil {
+		return err
+	}
+	replaceLink := false
+	if present && !managed {
+		target, err := os.Readlink(paths.OdinBinLink)
+		if err != nil {
+			return err
+		}
+		resolved := target
+		if !filepath.IsAbs(target) {
+			resolved = filepath.Join(filepath.Dir(paths.OdinBinLink), target)
+		}
+		if pathWithin(filepath.Clean(resolved), srcDir) {
+			replaceLink = true
+		} else {
+			return fmt.Errorf("%s points elsewhere and is not managed by odin-up. Refusing to overwrite it", paths.OdinBinLink)
+		}
+	}
+
+	if err := runner.EnsurePrivileges(); err != nil {
+		return err
+	}
+	if err := ensureVersionsDir(runner); err != nil {
+		return err
+	}
+	if err := moveIntoVersions(runner, srcDir, name); err != nil {
+		return err
+	}
+	if err := switchCurrent(runner, name); err != nil {
+		return err
+	}
+
+	switch {
+	case managed:
+	case present && replaceLink:
+		if err := runner.RunPrivileged("ln", "-sfn", paths.CurrentBinary(), paths.OdinBinLink); err != nil {
+			return fmt.Errorf("failed to update %s: %w", paths.OdinBinLink, err)
+		}
+	default:
+		if err := runner.RunPrivileged("ln", "-s", paths.CurrentBinary(), paths.OdinBinLink); err != nil {
+			return fmt.Errorf("failed to create %s: %w", paths.OdinBinLink, err)
+		}
+	}
+
+	if _, err := validateInstall(runner, paths.VersionDir(name)); err != nil {
+		return fmt.Errorf("adopted installation failed verification: %w", err)
+	}
+	return nil
+}
+
+// pathWithin reports whether p is lexically located inside base.
+func pathWithin(p, base string) bool {
+	return strings.HasPrefix(filepath.Clean(p), filepath.Clean(base)+string(filepath.Separator))
+}
+
+// existingInstallDir returns the directory of an unmanaged Odin installation
+// found on PATH, or "" when none exists.
+func existingInstallDir() string {
+	bin, err := findUnmanagedOdin()
+	if err != nil || bin == "" {
+		return ""
+	}
+	return filepath.Dir(bin)
 }
 
 func (in *Installer) fetchLatest(ctx context.Context) (*githubclient.Release, error) {

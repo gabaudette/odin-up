@@ -240,6 +240,43 @@ func TestFormatStatusNoUnmanagedNote(t *testing.T) {
 	}
 }
 
+func TestPathWithin(t *testing.T) {
+	cases := []struct {
+		p    string
+		base string
+		ok   bool
+	}{
+		{"/opt/odin/x/odin", "/opt/odin", true},
+		{"/opt/odin/versions/v1/odin", "/opt/odin/versions", true},
+		{"/opt/odin", "/opt/odin", false},
+		{"/opt/odinx/odin", "/opt/odin", false},
+		{"/usr/local/bin/odin", "/opt/odin", false},
+		{"", "/opt/odin", false},
+	}
+	for _, c := range cases {
+		if got := pathWithin(c.p, c.base); got != c.ok {
+			t.Errorf("pathWithin(%q, %q) = %v, want %v", c.p, c.base, got, c.ok)
+		}
+	}
+}
+
+func TestExistingInstallDir(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "odin"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	want, _ := filepath.EvalSymlinks(dir)
+	if got := existingInstallDir(); got != want {
+		t.Fatalf("existingInstallDir() = %q, want %q", got, want)
+	}
+	// No odin on PATH: nothing to adopt.
+	t.Setenv("PATH", t.TempDir())
+	if got := existingInstallDir(); got != "" {
+		t.Fatalf("expected no existing install, got %q", got)
+	}
+}
+
 func TestFindUnmanagedOdin(t *testing.T) {
 	dir := t.TempDir()
 	cli := filepath.Join(dir, "odin")

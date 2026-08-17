@@ -7,6 +7,7 @@ Install, update, inspect and uninstall the [Odin](https://odin-lang.org) compile
 - Fetches the latest official Odin release from the `odin-lang/Odin` GitHub repository.
 - Downloads the Linux archive matching your architecture (`amd64` / `arm64`).
 - Installs into a versioned layout under `/opt/odin` and exposes `odin` via `/usr/local/bin/odin`.
+- Offers to adopt an existing Odin installation into the managed layout instead of downloading a fresh copy.
 - Interactive menu, install progress, and confirmations built on Bubble Tea.
 - Privileged operations run through `sudo`, so `odin-up` never needs to run as root.
 - Update is safe: the currently installed version is left untouched until the new one has been downloaded, extracted and validated, then swapped atomically.
