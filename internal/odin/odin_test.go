@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -218,5 +219,55 @@ func TestObsoleteVersionNamesMissingDir(t *testing.T) {
 	}
 	if len(obsolete) != 0 {
 		t.Fatalf("expected no obsolete versions, got %v", obsolete)
+	}
+}
+
+func TestFormatStatusReportsUnmanagedOdin(t *testing.T) {
+	st := &Status{Arch: "amd64", UnmanagedOdin: "/home/gabriel/odin/odin"}
+	out := FormatStatus(st)
+	if !strings.Contains(out, "Not installed") {
+		t.Fatalf("expected Not installed state in:\n%s", out)
+	}
+	if !strings.Contains(out, "Note: an unmanaged odin was found at /home/gabriel/odin/odin") {
+		t.Fatalf("expected unmanaged note in:\n%s", out)
+	}
+}
+
+func TestFormatStatusNoUnmanagedNote(t *testing.T) {
+	out := FormatStatus(&Status{Arch: "amd64"})
+	if strings.Contains(out, "unmanaged") {
+		t.Fatalf("unexpected unmanaged note in:\n%s", out)
+	}
+}
+
+func TestFindUnmanagedOdin(t *testing.T) {
+	dir := t.TempDir()
+	cli := filepath.Join(dir, "odin")
+	if err := os.WriteFile(cli, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	got, err := findUnmanagedOdin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := filepath.EvalSymlinks(cli)
+	if got != want {
+		t.Fatalf("findUnmanagedOdin() = %q, want %q", got, want)
+	}
+}
+
+func TestFindUnmanagedOdinSkipsNonExecutable(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "odin"), []byte("#!/bin/sh\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	got, err := findUnmanagedOdin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "" {
+		t.Fatalf("expected no unmanaged odin, got %q", got)
 	}
 }

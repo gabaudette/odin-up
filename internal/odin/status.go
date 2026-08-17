@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"odin-up/internal/paths"
@@ -22,9 +23,47 @@ type Status struct {
 	BinLinkPresent  bool
 	BinLinkManaged  bool
 	BinLinkTarget   string
+	UnmanagedOdin   string
 	LatestVersion   string
 	UpdateAvailable bool
 	LatestError     string
+}
+
+// findUnmanagedOdin locates the first executable named "odin" on PATH that is
+// not managed by odin-up. The managed /usr/local/bin/odin link and anything
+// resolving into /opt/odin are skipped, so this only reports binaries odin-up
+// does not own.
+func findUnmanagedOdin() (string, error) {
+	path := os.Getenv("PATH")
+	if path == "" {
+		return "", nil
+	}
+	for _, dir := range filepath.SplitList(path) {
+		if dir == "" {
+			dir = "."
+		}
+		candidate := filepath.Join(dir, "odin")
+		info, err := os.Stat(candidate)
+		if err != nil || info.IsDir() || info.Mode().Perm()&0o111 == 0 {
+			continue
+		}
+		if isBinLinkManaged(candidate) {
+			continue
+		}
+		resolved, err := filepath.EvalSymlinks(candidate)
+		if err != nil {
+			resolved, err = filepath.Abs(candidate)
+			if err != nil {
+				continue
+			}
+		}
+		root := filepath.Clean(paths.OdinRoot)
+		if strings.HasPrefix(filepath.Clean(resolved), root+string(filepath.Separator)) {
+			continue
+		}
+		return resolved, nil
+	}
+	return "", nil
 }
 
 // Status collects installation and release information without modifying the
@@ -54,6 +93,10 @@ func (in *Installer) Status(ctx context.Context) (*Status, error) {
 		st.BinLinkManaged = isBinLinkManaged(target)
 	} else if info, err := os.Lstat(paths.OdinBinLink); err == nil && info.Mode()&os.ModeSymlink == 0 {
 		st.BinLinkPresent = true
+	}
+
+	if unmanaged, err := findUnmanagedOdin(); err == nil {
+		st.UnmanagedOdin = unmanaged
 	}
 
 	rel, err := in.Client.LatestRelease(ctx, Owner, Repo)
@@ -93,6 +136,10 @@ func FormatStatus(st *Status) string {
 		} else if !st.BinLinkManaged {
 			b.WriteString(row("Bin link", "not managed by odin-up") + "\n")
 		}
+	}
+
+	if st.UnmanagedOdin != "" {
+		b.WriteString("\nNote: an unmanaged odin was found at " + st.UnmanagedOdin + "\n")
 	}
 
 	b.WriteString("\nLatest release\n\n")
