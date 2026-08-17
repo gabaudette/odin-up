@@ -27,6 +27,7 @@ func (r Reporter) step(label string) {
 	if r == nil {
 		return
 	}
+
 	r(Event{Kind: EventStep, Label: label})
 }
 
@@ -34,6 +35,7 @@ func (r Reporter) log(label string) {
 	if r == nil {
 		return
 	}
+
 	r(Event{Kind: EventLog, Label: label})
 }
 
@@ -41,5 +43,6 @@ func (r Reporter) progress(p float64) {
 	if r == nil {
 		return
 	}
+
 	r(Event{Kind: EventProgress, Percent: p})
 }

@@ -18,12 +18,14 @@ var ErrNoMatchingAsset = errors.New("no matching Linux archive in release assets
 // odin-linux-<arch>-<tag>.tar.gz.
 func SelectAsset(assets []githubclient.Asset, arch string) (*githubclient.Asset, error) {
 	prefix := "odin-linux-" + arch + "-"
+
 	for i := range assets {
 		a := assets[i]
 		if strings.HasPrefix(a.Name, prefix) && strings.HasSuffix(a.Name, ".tar.gz") {
 			return &a, nil
 		}
 	}
+
 	return nil, fmt.Errorf("%w: %s", ErrNoMatchingAsset, arch)
 }
 
@@ -37,6 +39,7 @@ func VersionDirName(name string) (string, error) {
 	if !safeNamePattern.MatchString(name) {
 		return "", fmt.Errorf("invalid version directory name: %q", name)
 	}
+
 	return name, nil
 }
 
@@ -44,5 +47,6 @@ func VersionDirName(name string) (string, error) {
 // directory name such as "odin-linux-amd64-dev-2026-08".
 func VersionFromDirName(dir string) string {
 	re := regexp.MustCompile(`^odin-linux-(?:amd64|arm64)-`)
+
 	return re.ReplaceAllString(dir, "")
 }

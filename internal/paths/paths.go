@@ -23,5 +23,6 @@ func ActiveTarget(linkTarget string) string {
 	if filepath.IsAbs(linkTarget) {
 		return linkTarget
 	}
+
 	return filepath.Join(OdinRoot, linkTarget)
 }

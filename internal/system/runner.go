@@ -33,23 +33,29 @@ func (PlainRunner) IsRoot() bool {
 
 func (PlainRunner) Output(name string, args ...string) (string, error) {
 	out, err := exec.Command(name, args...).CombinedOutput()
+
 	if err != nil {
 		if len(out) > 0 {
 			return string(out), fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
 		}
+
 		return "", err
 	}
+
 	return string(out), nil
 }
 
 func (r PlainRunner) RunPrivileged(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
+
 	if !r.IsRoot() {
 		cmd = exec.Command("sudo", append([]string{name}, args...)...)
 	}
+
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	return cmd.Run()
 }
 
@@ -57,13 +63,16 @@ func (r PlainRunner) EnsurePrivileges() error {
 	if r.IsRoot() {
 		return nil
 	}
+
 	cmd := exec.Command("sudo", "-v")
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to obtain elevated privileges: %w", err)
 	}
+
 	return nil
 }
 

@@ -56,6 +56,7 @@ func (e *APIError) Error() string {
 	if e.Message != "" {
 		return fmt.Sprintf("GitHub API request failed (HTTP %d): %s", e.StatusCode, e.Message)
 	}
+
 	return fmt.Sprintf("GitHub API request failed (HTTP %d)", e.StatusCode)
 }
 
@@ -64,16 +65,21 @@ func (e *APIError) Error() string {
 // falls back to the most recent non-draft release.
 func (c *Client) LatestRelease(ctx context.Context, owner, repo string) (*Release, error) {
 	rel, err := c.getRelease(ctx, owner, repo, "/releases/latest")
+
 	if err == nil {
 		return rel, nil
 	}
+
 	var apiErr *APIError
+
 	if ok := findAPIError(err, &apiErr); ok && apiErr.StatusCode == http.StatusNotFound {
 		releases := []Release{}
 		obj := &releases
+
 		if err := c.get(ctx, c.URL+"/repos/"+owner+"/"+repo+"/releases?per_page=10", obj); err != nil {
 			return nil, err
 		}
+
 		for _, r := range releases {
 			if r.Draft {
 				continue
@@ -81,31 +87,39 @@ func (c *Client) LatestRelease(ctx context.Context, owner, repo string) (*Releas
 			rel := r
 			return &rel, nil
 		}
+
 		return nil, fmt.Errorf("no published releases found for %s/%s", owner, repo)
 	}
+
 	return nil, err
 }
 
 func (c *Client) getRelease(ctx context.Context, owner, repo, path string) (*Release, error) {
 	rel := &Release{}
+
 	if err := c.get(ctx, c.URL+"/repos/"+owner+"/"+repo+path, rel); err != nil {
 		return nil, err
 	}
+
 	return rel, nil
 }
 
 func (c *Client) get(ctx context.Context, url string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+
 	if err != nil {
 		return err
 	}
+
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", userAgent+"/"+version)
 
 	resp, err := c.HTTP.Do(req)
+
 	if err != nil {
 		return fmt.Errorf("request to %s failed: %w", url, err)
 	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -116,6 +130,7 @@ func (c *Client) get(ctx context.Context, url string, out any) error {
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
 		return fmt.Errorf("decoding response from %s: %w", url, err)
 	}
+
 	return nil
 }
 
@@ -129,13 +144,17 @@ func summarize(body string) string {
 	msg := struct {
 		Message string `json:"message"`
 	}{}
+
 	if json.Unmarshal([]byte(body), &msg) == nil && msg.Message != "" {
 		return msg.Message
 	}
+
 	trimmed := strings.TrimSpace(body)
+
 	if len(trimmed) > 300 {
 		trimmed = trimmed[:300] + " ..."
 	}
+
 	return trimmed
 }
 
@@ -145,12 +164,17 @@ func findAPIError(err error, out **APIError) bool {
 			*out = apiErr
 			return true
 		}
+
 		type unwrapper interface{ Unwrap() error }
+
 		u, ok := err.(unwrapper)
+
 		if !ok {
 			return false
 		}
+
 		err = u.Unwrap()
 	}
+
 	return false
 }

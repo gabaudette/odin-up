@@ -42,6 +42,7 @@ func run(args []string) int {
 	if len(args) == 0 {
 		return tui.Run(tui.OpMenu)
 	}
+
 	switch args[0] {
 	case "-h", "--help", "help":
 		fmt.Print(usage)
@@ -65,6 +66,7 @@ func run(args []string) int {
 
 func withLock(op tui.OpKind) int {
 	lock, err := system.AcquireLock("/tmp/odin-up.lock")
+
 	if err != nil {
 		if errors.Is(err, system.ErrAnotherRunning) {
 			fmt.Fprintln(os.Stderr, "Another odin-up operation is currently running.")
@@ -73,17 +75,22 @@ func withLock(op tui.OpKind) int {
 		}
 		return 1
 	}
+
 	defer lock.Release()
+
 	return tui.Run(op)
 }
 
 func runStatus() int {
 	inst := &odin.Installer{Client: githubclient.New(), Runner: system.PlainRunner{}}
 	st, err := inst.Status(context.Background())
+
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: "+err.Error())
 		return 1
 	}
+
 	fmt.Print(odin.FormatStatus(st))
+
 	return 0
 }

@@ -36,29 +36,37 @@ func containsDigit(s string) bool {
 
 func extractVersion(line string) string {
 	var candidates []string
+
 	add := func(c string) {
 		c = strings.TrimSpace(c)
 		candidates = append(candidates, c)
+
 		if i := strings.IndexByte(c, ':'); i >= 0 {
 			candidates = append(candidates, c[:i])
 		}
 	}
+
 	if i := strings.LastIndex(line, " version "); i >= 0 {
 		add(line[i+len(" version "):])
 	}
+
 	if m := prefixColonRe.FindStringSubmatch(line); m != nil {
 		add(m[1])
 	}
+
 	// Bare label with a build sha: "dev-2026-08-nightly:abcdef12".
 	if !strings.ContainsAny(line, " \t") {
 		add(line)
 	}
+
 	add(line)
+
 	for _, c := range candidates {
 		if looksLikeVersion(c) {
 			return c
 		}
 	}
+
 	return ""
 }
 
@@ -69,16 +77,20 @@ func extractVersion(line string) string {
 func ParseVersion(output, versionFromDirName string) string {
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
+
 		if line == "" {
 			continue
 		}
+
 		if v := extractVersion(line); v != "" {
 			return normalizeVersion(v)
 		}
 	}
+
 	if looksLikeVersion(versionFromDirName) {
 		return versionFromDirName
 	}
+
 	return ""
 }
 
@@ -86,12 +98,15 @@ func ParseVersion(output, versionFromDirName string) string {
 // :<sha>) from a version label.
 func normalizeVersion(v string) string {
 	v = strings.TrimSpace(v)
+
 	if i := strings.IndexByte(v, ':'); i >= 0 {
 		v = v[:i]
 	}
+
 	if strings.HasSuffix(v, "-nightly") && len(v) > len("-nightly") {
 		v = strings.TrimSuffix(v, "-nightly")
 	}
+
 	return v
 }
 
@@ -101,25 +116,34 @@ func normalizeVersion(v string) string {
 func validateInstall(runner system.Runner, dir string) (string, error) {
 	bin := filepath.Join(dir, "odin")
 	info, err := os.Stat(bin)
+
 	if err != nil {
 		return "", fmt.Errorf("missing Odin executable: %s (expected at %s)", err, bin)
 	}
+
 	if info.IsDir() {
 		return "", fmt.Errorf("%s is a directory, not the Odin executable", bin)
 	}
+
 	if info.Mode().Perm()&0o111 == 0 {
 		return "", fmt.Errorf("%s is not executable", bin)
 	}
+
 	if coreInfo, err := os.Stat(filepath.Join(dir, "core")); err != nil || !coreInfo.IsDir() {
 		return "", fmt.Errorf("invalid installation: Odin core library directory is missing next to the compiler")
 	}
+
 	out, err := runner.Output(bin, "version")
+
 	if err != nil {
 		return "", fmt.Errorf("running '%s version' failed: %w", bin, err)
 	}
+
 	version := ParseVersion(out, release.VersionFromDirName(filepath.Base(dir)))
+
 	if version == "" {
 		return "", fmt.Errorf("could not determine Odin version from '%s version'", bin)
 	}
+
 	return version, nil
 }

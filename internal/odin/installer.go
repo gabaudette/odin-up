@@ -53,9 +53,11 @@ type MissingDepsError struct {
 
 func (e *MissingDepsError) Error() string {
 	names := make([]string, 0, len(e.Missing))
+
 	for _, d := range e.Missing {
 		names = append(names, d.Package)
 	}
+
 	return "missing required dependencies: " + strings.Join(names, ", ")
 }
 
@@ -78,10 +80,13 @@ func (in *Installer) Install(ctx context.Context) error {
 	if err := in.checkOS(); err != nil {
 		return err
 	}
+
 	arch, err := system.DetectArch()
+
 	if err != nil {
 		return err
 	}
+
 	if _, err := os.Lstat(paths.CurrentLink); err == nil {
 		return ErrAlreadyInstalled
 	}
@@ -92,9 +97,11 @@ func (in *Installer) Install(ctx context.Context) error {
 	if in.UI != nil {
 		if srcDir := existingInstallDir(); srcDir != "" {
 			ok, err := in.UI.ConfirmAdopt(srcDir)
+
 			if err != nil {
 				return err
 			}
+
 			if ok {
 				in.step("Adopting existing installation")
 				return adoptExisting(in.Runner, srcDir)
@@ -108,28 +115,38 @@ func (in *Installer) Install(ctx context.Context) error {
 		if in.UI == nil {
 			return &MissingDepsError{Missing: missing}
 		}
+
 		ok, err := in.UI.ConfirmInstallDeps(missing)
+
 		if err != nil {
 			return err
 		}
+
 		if !ok {
 			return ErrCanceled
 		}
+
 		in.step("Installing dependencies")
+
 		if err := system.InstallDependencies(in.Runner, missing); err != nil {
 			return err
 		}
 	}
 
 	rel, err := in.fetchLatest(ctx)
+
 	if err != nil {
 		return err
 	}
+
 	asset, err := release.SelectAsset(rel.Assets, arch)
+
 	if err != nil {
 		return err
 	}
+
 	in.step("Downloading " + rel.TagName)
+
 	return in.installRelease(ctx, asset, "")
 }
 
@@ -140,31 +157,43 @@ func (in *Installer) Update(ctx context.Context) error {
 	if err := in.checkOS(); err != nil {
 		return err
 	}
+
 	arch, err := system.DetectArch()
+
 	if err != nil {
 		return err
 	}
+
 	if _, err := os.Lstat(paths.CurrentLink); err != nil {
 		return ErrNotInstalled
 	}
 
 	in.step("Detecting installed version")
+
 	installed := CurrentVersion(in.Runner)
+
 	if installed == "" {
 		installed = release.VersionFromDirName(ActiveVersionName())
 	}
+
 	rel, err := in.fetchLatest(ctx)
+
 	if err != nil {
 		return err
 	}
+
 	if installed != "" && release.VersionsEqual(installed, rel.TagName) {
 		return ErrUpToDate
 	}
+
 	asset, err := release.SelectAsset(rel.Assets, arch)
+
 	if err != nil {
 		return err
 	}
+
 	in.step("Downloading " + rel.TagName)
+
 	return in.installRelease(ctx, asset, installed)
 }
 
@@ -173,12 +202,16 @@ func (in *Installer) Update(ctx context.Context) error {
 // points at the adopted directory; anything else is refused.
 func adoptExisting(runner system.Runner, srcDir string) error {
 	version, err := validateInstall(runner, srcDir)
+
 	if err != nil {
 		return fmt.Errorf("cannot adopt existing installation: %w", err)
 	}
+
 	name, err := release.VersionDirName(version)
+
 	if err != nil {
 		name, err = release.VersionDirName(filepath.Base(srcDir))
+
 		if err != nil {
 			return fmt.Errorf("cannot adopt existing installation: %w", err)
 		}
@@ -187,19 +220,26 @@ func adoptExisting(runner system.Runner, srcDir string) error {
 	// Decide whether /usr/local/bin/odin may be touched before the source
 	// directory moves and its link starts dangling.
 	managed, present, err := binLinkStatus()
+
 	if err != nil {
 		return err
 	}
+
 	replaceLink := false
+
 	if present && !managed {
 		target, err := os.Readlink(paths.OdinBinLink)
+
 		if err != nil {
 			return err
 		}
+
 		resolved := target
+
 		if !filepath.IsAbs(target) {
 			resolved = filepath.Join(filepath.Dir(paths.OdinBinLink), target)
 		}
+
 		if pathWithin(filepath.Clean(resolved), srcDir) {
 			replaceLink = true
 		} else {
@@ -210,12 +250,15 @@ func adoptExisting(runner system.Runner, srcDir string) error {
 	if err := runner.EnsurePrivileges(); err != nil {
 		return err
 	}
+
 	if err := ensureVersionsDir(runner); err != nil {
 		return err
 	}
+
 	if err := moveIntoVersions(runner, srcDir, name); err != nil {
 		return err
 	}
+
 	if err := switchCurrent(runner, name); err != nil {
 		return err
 	}
@@ -235,6 +278,7 @@ func adoptExisting(runner system.Runner, srcDir string) error {
 	if _, err := validateInstall(runner, paths.VersionDir(name)); err != nil {
 		return fmt.Errorf("adopted installation failed verification: %w", err)
 	}
+
 	return nil
 }
 
@@ -247,14 +291,17 @@ func pathWithin(p, base string) bool {
 // found on PATH, or "" when none exists.
 func existingInstallDir() string {
 	bin, err := findUnmanagedOdin()
+
 	if err != nil || bin == "" {
 		return ""
 	}
+
 	return filepath.Dir(bin)
 }
 
 func (in *Installer) fetchLatest(ctx context.Context) (*githubclient.Release, error) {
 	in.step("Fetching latest release")
+
 	return in.Client.LatestRelease(ctx, Owner, Repo)
 }
 
@@ -262,34 +309,44 @@ func (in *Installer) fetchLatest(ctx context.Context) (*githubclient.Release, er
 // is non-empty (update), obsolete versions are pruned afterwards.
 func (in *Installer) installRelease(ctx context.Context, asset *githubclient.Asset, keepVersion string) error {
 	tmpDir, err := os.MkdirTemp("", "odin-up-")
+
 	if err != nil {
 		return err
 	}
+
 	defer os.RemoveAll(tmpDir)
 
 	archive := filepath.Join(tmpDir, asset.Name)
+
 	if err := in.download(ctx, asset, archive); err != nil {
 		return err
 	}
 
 	in.step("Extracting archive")
 	extractDir := filepath.Join(tmpDir, "extract")
+
 	if err := os.MkdirAll(extractDir, 0o755); err != nil {
 		return err
 	}
+
 	if err := extractArchive(archive, extractDir); err != nil {
 		return err
 	}
+
 	candidate, err := findOdinDir(extractDir)
+
 	if err != nil {
 		return err
 	}
+
 	name := filepath.Base(candidate)
+
 	if err := validateVersionDirName(name); err != nil {
 		return err
 	}
 
 	in.step("Validating installation")
+
 	if _, err := validateInstall(in.Runner, candidate); err != nil {
 		return err
 	}
@@ -299,24 +356,29 @@ func (in *Installer) installRelease(ctx context.Context, asset *githubclient.Ass
 	}
 
 	in.step("Installing to " + paths.VersionsDir)
+
 	if err := ensureVersionsDir(in.Runner); err != nil {
 		return err
 	}
+
 	if err := moveIntoVersions(in.Runner, candidate, name); err != nil {
 		return err
 	}
 
 	in.step("Activating version " + name)
+
 	if err := switchCurrent(in.Runner, name); err != nil {
 		return err
 	}
 
 	in.step("Updating " + paths.OdinBinLink)
+
 	if err := ensureBinLink(in.Runner); err != nil {
 		return err
 	}
 
 	in.step("Final verification")
+
 	if _, err := validateInstall(in.Runner, paths.VersionDir(name)); err != nil {
 		return err
 	}
@@ -327,7 +389,9 @@ func (in *Installer) installRelease(ctx context.Context, asset *githubclient.Ass
 			return err
 		}
 	}
+
 	in.step("Cleaning up")
+
 	return nil
 }
 
@@ -337,43 +401,55 @@ func (in *Installer) Uninstall() error {
 	if !isManagedRoot() {
 		return fmt.Errorf("no odin-up managed installation found at %s", paths.OdinRoot)
 	}
+
 	if in.UI == nil {
 		return errors.New("uninstall requires interactive confirmation")
 	}
+
 	ok, err := in.UI.ConfirmUninstall()
+
 	if err != nil {
 		return err
 	}
+
 	if !ok {
 		return ErrCanceled
 	}
 
 	managed, present, err := binLinkStatus()
+
 	if err != nil {
 		return err
 	}
+
 	if err := in.Runner.EnsurePrivileges(); err != nil {
 		return err
 	}
 
 	in.step("Removing " + paths.OdinRoot)
+
 	if err := removePrivRecursive(in.Runner, paths.OdinRoot); err != nil {
 		return err
 	}
+
 	if present && managed {
 		in.step("Removing " + paths.OdinBinLink)
+
 		if err := removePrivRecursive(in.Runner, paths.OdinBinLink); err != nil {
 			return err
 		}
 	}
+
 	if _, err := os.Lstat(paths.OdinRoot); err == nil {
 		return fmt.Errorf("failed to remove %s", paths.OdinRoot)
 	}
+
 	if present && managed {
 		if _, err := os.Lstat(paths.OdinBinLink); err == nil {
 			return fmt.Errorf("failed to remove %s", paths.OdinBinLink)
 		}
 	}
+
 	return nil
 }
 
@@ -381,39 +457,52 @@ func (in *Installer) Uninstall() error {
 func (in *Installer) download(ctx context.Context, asset *githubclient.Asset, dest string) error {
 	client := &http.Client{Timeout: 0}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.DownloadURL, nil)
+
 	if err != nil {
 		return err
 	}
+
 	req.Header.Set("User-Agent", "odin-up")
 
 	resp, err := client.Do(req)
+
 	if err != nil {
 		return fmt.Errorf("failed to download Odin release.\nURL: %s\nReason: %v", asset.DownloadURL, err)
 	}
+
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to download Odin release (HTTP %d).\nURL: %s", resp.StatusCode, asset.DownloadURL)
 	}
 
 	file, err := os.Create(dest)
+
 	if err != nil {
 		return err
 	}
+
 	pw := &progressWriter{total: resp.ContentLength, reporter: in.Reporter}
+
 	written, err := io.Copy(io.MultiWriter(file, pw), resp.Body)
+
 	if err != nil {
 		file.Close()
 		os.Remove(dest)
+
 		return fmt.Errorf("download interrupted: %w", err)
 	}
+
 	if err := file.Close(); err != nil {
 		os.Remove(dest)
 		return err
 	}
+
 	if resp.ContentLength > 0 && written != resp.ContentLength {
 		os.Remove(dest)
 		return fmt.Errorf("download incomplete: expected %d bytes, received %d", resp.ContentLength, written)
 	}
+
 	return nil
 }
 
@@ -427,12 +516,15 @@ type progressWriter struct {
 func (w *progressWriter) Write(p []byte) (int, error) {
 	n := len(p)
 	w.written += int64(n)
+
 	if w.total > 0 {
 		pct := float64(w.written) / float64(w.total)
+
 		if pct-w.last >= 0.01 || pct >= 1.0 {
 			w.last = pct
 			w.reporter(Event{Kind: EventProgress, Percent: pct})
 		}
 	}
+
 	return n, nil
 }

@@ -21,6 +21,7 @@ func newUI(prog *tea.Program) odin.UI {
 func (u *ui) confirm(question string, options []string) (int, error) {
 	ch := make(chan int, 1)
 	u.prog.Send(confirmRequestMsg{question: question, options: options, ch: ch})
+
 	return <-ch, nil
 }
 
@@ -29,31 +30,40 @@ func (u *ui) ConfirmInstallDeps(missing []system.Dependency) (bool, error) {
 	for _, d := range missing {
 		names = append(names, d.Package)
 	}
+
 	question := "Missing required dependencies:\n\n  " + strings.Join(names, "\n  ") +
 		"\n\nInstall them with apt before continuing?"
+
 	idx, err := u.confirm(question, []string{"Cancel", "Install dependencies"})
+
 	if err != nil {
 		return false, err
 	}
+
 	return idx == 1, nil
 }
 
 func (u *ui) ConfirmUninstall() (bool, error) {
 	question := "Uninstall Odin?\n\nThis will remove:\n\n  /opt/odin\n  /usr/local/bin/odin\n\nThis action cannot be undone."
 	idx, err := u.confirm(question, []string{"Cancel", "Uninstall"})
+
 	if err != nil {
 		return false, err
 	}
+
 	return idx == 1, nil
 }
 
 func (u *ui) ConfirmAdopt(location string) (bool, error) {
 	question := "An existing Odin installation was found at:\n\n  " + location +
 		"\n\nAdopt it as the managed installation (moves it under /opt/odin) instead of downloading a new copy?"
+
 	idx, err := u.confirm(question, []string{"Cancel", "Adopt existing installation"})
+
 	if err != nil {
 		return false, err
 	}
+
 	return idx == 1, nil
 }
 

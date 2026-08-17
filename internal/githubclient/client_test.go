@@ -12,9 +12,11 @@ import (
 func jsonBody(t *testing.T, v any) string {
 	t.Helper()
 	b, err := json.Marshal(v)
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return string(b)
 }
 
@@ -29,16 +31,20 @@ func TestLatestRelease(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(jsonBody(t, latest)))
 	}))
+
 	defer srv.Close()
 
 	c := &Client{HTTP: srv.Client(), URL: srv.URL}
 	rel, err := c.LatestRelease(context.Background(), "odin-lang", "Odin")
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if rel.TagName != "dev-2026-08" || len(rel.Assets) != 1 {
 		t.Fatalf("unexpected release: %+v", rel)
 	}
+
 	if rel.Assets[0].Name != asset.Name {
 		t.Fatalf("unexpected asset: %+v", rel.Assets[0])
 	}
@@ -50,6 +56,7 @@ func TestLatestReleaseFallsBackToList(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+
 		switch r.URL.Path {
 		case "/repos/odin-lang/Odin/releases/latest":
 			w.WriteHeader(http.StatusNotFound)
@@ -63,13 +70,16 @@ func TestLatestReleaseFallsBackToList(t *testing.T) {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
 	}))
+
 	defer srv.Close()
 
 	c := &Client{HTTP: srv.Client(), URL: srv.URL}
 	rel, err := c.LatestRelease(context.Background(), "odin-lang", "Odin")
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if rel.TagName != "dev-2026-08" {
 		t.Fatalf("expected fallback release, got %+v", rel)
 	}
@@ -78,6 +88,7 @@ func TestLatestReleaseFallsBackToList(t *testing.T) {
 func TestLatestReleaseNoPublished(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+
 		switch r.URL.Path {
 		case "/repos/o/r/releases/latest":
 			w.WriteHeader(http.StatusNotFound)
@@ -86,9 +97,11 @@ func TestLatestReleaseNoPublished(t *testing.T) {
 			_, _ = w.Write([]byte("[]"))
 		}
 	}))
+
 	defer srv.Close()
 
 	c := &Client{HTTP: srv.Client(), URL: srv.URL}
+
 	if _, err := c.LatestRelease(context.Background(), "o", "r"); err == nil {
 		t.Fatal("expected error with no published releases")
 	}
@@ -99,17 +112,22 @@ func TestAPIErrorWrapping(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"message":"rate limit exceeded"}`))
 	}))
+
 	defer srv.Close()
 
 	c := &Client{HTTP: srv.Client(), URL: srv.URL}
 	_, err := c.LatestRelease(context.Background(), "o", "r")
+
 	var apiErr *APIError
+
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %v", err)
 	}
+
 	if apiErr.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected status 403, got %d", apiErr.StatusCode)
 	}
+
 	if apiErr.Message != "rate limit exceeded" {
 		t.Fatalf("unexpected message %q", apiErr.Message)
 	}

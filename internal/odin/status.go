@@ -42,27 +42,36 @@ func findUnmanagedOdin() (string, error) {
 		if dir == "" {
 			dir = "."
 		}
+
 		candidate := filepath.Join(dir, "odin")
 		info, err := os.Stat(candidate)
+
 		if err != nil || info.IsDir() || info.Mode().Perm()&0o111 == 0 {
 			continue
 		}
+
 		if isBinLinkManaged(candidate) {
 			continue
 		}
+
 		resolved, err := filepath.EvalSymlinks(candidate)
+
 		if err != nil {
 			resolved, err = filepath.Abs(candidate)
 			if err != nil {
 				continue
 			}
 		}
+
 		root := filepath.Clean(paths.OdinRoot)
+
 		if strings.HasPrefix(filepath.Clean(resolved), root+string(filepath.Separator)) {
 			continue
 		}
+
 		return resolved, nil
 	}
+
 	return "", nil
 }
 
@@ -70,18 +79,23 @@ func findUnmanagedOdin() (string, error) {
 // system.
 func (in *Installer) Status(ctx context.Context) (*Status, error) {
 	arch, err := system.DetectArch()
+
 	if err != nil {
 		return nil, err
 	}
+
 	st := &Status{Arch: arch, Location: paths.CurrentLink}
 
 	if _, err := os.Lstat(paths.CurrentLink); err == nil {
 		st.Installed = true
 		st.VersionName = ActiveVersionName()
+
 		if target, err := os.Readlink(paths.CurrentLink); err == nil {
 			st.CurrentTarget = paths.ActiveTarget(target)
 		}
+
 		st.Version = CurrentVersion(in.Runner)
+
 		if st.Version == "" {
 			st.Version = release.VersionFromDirName(st.VersionName)
 		}
@@ -100,14 +114,17 @@ func (in *Installer) Status(ctx context.Context) (*Status, error) {
 	}
 
 	rel, err := in.Client.LatestRelease(ctx, Owner, Repo)
+
 	if err != nil {
 		st.LatestError = err.Error()
 	} else {
 		st.LatestVersion = rel.TagName
+
 		if st.Installed && st.Version != "" && !release.VersionsEqual(st.Version, rel.TagName) {
 			st.UpdateAvailable = true
 		}
 	}
+
 	return st, nil
 }
 
@@ -122,7 +139,9 @@ func row(label, value string) string {
 // FormatStatus renders a human-readable status report.
 func FormatStatus(st *Status) string {
 	var b strings.Builder
+
 	b.WriteString("Odin installation\n\n")
+
 	if !st.Installed {
 		b.WriteString(row("Status", "Not installed") + "\n")
 	} else {
@@ -131,6 +150,7 @@ func FormatStatus(st *Status) string {
 		b.WriteString(row("Architecture", system.TokenToName(st.Arch)) + "\n")
 		b.WriteString(row("Location", st.Location) + "\n")
 		b.WriteString(row("Executable", paths.OdinBinLink) + "\n")
+
 		if !st.BinLinkPresent {
 			b.WriteString(row("Bin link", "missing") + "\n")
 		} else if !st.BinLinkManaged {
@@ -143,16 +163,20 @@ func FormatStatus(st *Status) string {
 	}
 
 	b.WriteString("\nLatest release\n\n")
+
 	if st.LatestError != "" {
 		b.WriteString(row("Version", "unavailable") + "\n")
 		b.WriteString(row("Error", st.LatestError) + "\n")
 	} else {
 		b.WriteString(row("Version", st.LatestVersion) + "\n")
+
 		if st.Installed {
 			statusText := "Up to date"
+
 			if st.UpdateAvailable {
 				statusText = "Update available"
 			}
+
 			b.WriteString(row("Status", statusText) + "\n")
 		}
 	}
@@ -161,5 +185,6 @@ func FormatStatus(st *Status) string {
 		b.WriteString("\nRun:\n\n")
 		b.WriteString("  odin-up install\n")
 	}
+
 	return b.String()
 }

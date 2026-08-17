@@ -20,15 +20,19 @@ func testAssets() []githubclient.Asset {
 
 func TestSelectAsset(t *testing.T) {
 	a, err := SelectAsset(testAssets(), "amd64")
+
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if a.Name != "odin-linux-amd64-dev-2026-08.tar.gz" {
 		t.Fatalf("got %s", a.Name)
 	}
+
 	if !strings.HasPrefix(a.Name, "odin-linux-amd64-") {
 		t.Fatal("asset must match linux amd64 prefix")
 	}
+
 	if !strings.HasSuffix(a.Name, ".tar.gz") {
 		t.Fatal("asset must be a tar.gz")
 	}
@@ -36,10 +40,13 @@ func TestSelectAsset(t *testing.T) {
 
 func TestSelectAssetMissing(t *testing.T) {
 	_, err := SelectAsset(testAssets(), "arm32")
+
 	if !errors.Is(err, ErrNoMatchingAsset) {
 		t.Fatalf("expected ErrNoMatchingAsset, got %v", err)
 	}
+
 	_, err = SelectAsset(nil, "amd64")
+
 	if !errors.Is(err, ErrNoMatchingAsset) {
 		t.Fatalf("expected ErrNoMatchingAsset on empty list, got %v", err)
 	}
@@ -54,17 +61,21 @@ func TestVersionDirName(t *testing.T) {
 		{"dev-2026-08/../../etc", ""},
 		{"dev 2026 08", ""},
 	}
+
 	for _, c := range cases {
 		got, err := VersionDirName(c.in)
+
 		if c.want == "" {
 			if err == nil {
 				t.Fatalf("VersionDirName(%q): expected error, got %q", c.in, got)
 			}
 			continue
 		}
+
 		if err != nil {
 			t.Fatalf("VersionDirName(%q): %v", c.in, err)
 		}
+
 		if got != c.want {
 			t.Fatalf("VersionDirName(%q) = %q, want %q", c.in, got, c.want)
 		}
@@ -81,14 +92,17 @@ func TestCompareVersions(t *testing.T) {
 		"dev-2026-07b",
 		"dev-2026-08",
 	}
+
 	for i, a := range ordered {
 		for j, b := range ordered {
 			want := -1
+
 			if i == j {
 				want = 0
 			} else if i > j {
 				want = 1
 			}
+
 			if got := CompareVersions(a, b); got != want {
 				t.Fatalf("CompareVersions(%q, %q) = %d, want %d", a, b, got, want)
 			}
@@ -100,12 +114,15 @@ func TestVersionsEqual(t *testing.T) {
 	if !VersionsEqual("dev-2026-08", "dev-2026-08") {
 		t.Fatal("same versions must be equal")
 	}
+
 	if !VersionsEqual("dev-2026-08", "dev-2026-08:abc123") {
 		t.Fatal("nightly with sha must equal plain nightly tag")
 	}
+
 	if !VersionsEqual("dev-2026-08", "dev-2026-08-nightly") {
 		t.Fatal("nightly build must equal its tag")
 	}
+
 	if VersionsEqual("dev-2026-08", "dev-2026-07") {
 		t.Fatal("different versions must not be equal")
 	}

@@ -112,10 +112,13 @@ func newModel(op OpKind) *model {
 	if op == OpMenu {
 		m.screen = screenMenu
 		items := make([]list.Item, 0, len(menuItems))
+
 		for _, it := range menuItems {
 			items = append(items, it)
 		}
+
 		m.list = list.New(items, list.NewDefaultDelegate(), 42, 9)
+
 		m.list.Title = "What would you like to do?"
 		m.list.SetShowStatusBar(false)
 		m.list.SetShowPagination(false)
@@ -132,31 +135,38 @@ func Run(op OpKind) int {
 	p := tea.NewProgram(m)
 	m.prog = p
 	mode, err := p.Run()
+
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+
 	mm, ok := mode.(*model)
 	if !ok {
 		return 0
 	}
+
 	if mm.screen == screenResult {
 		if mm.resultText != "" {
 			fmt.Println(strings.TrimRight(mm.resultText, "\n"))
 		}
+
 		if mm.resultErr != nil {
 			fmt.Fprintln(os.Stderr, "Error: "+mm.resultErr.Error())
 			return 1
 		}
 	}
+
 	return 0
 }
 
 func (m *model) Init() tea.Cmd {
 	batch := []tea.Cmd{m.spinner.Tick}
+
 	if m.op != OpMenu {
 		batch = append(batch, m.runOperation())
 	}
+
 	return tea.Batch(batch...)
 }
 
@@ -164,6 +174,7 @@ func (m *model) Init() tea.Cmd {
 // effective work through events and request messages.
 func (m *model) runOperation() tea.Cmd {
 	op := m.op
+
 	return func() tea.Msg {
 		prog := m.prog
 		runner := &ProgramRunner{Prog: prog}
@@ -178,12 +189,14 @@ func (m *model) runOperation() tea.Cmd {
 		switch op {
 		case OpInstall:
 			err = inst.Install(context.Background())
+
 			if err == nil {
 				v := odin.CurrentVersion(runner)
 				text = fmt.Sprintf("Odin successfully installed.\n\nVersion:\n%s\n\nExecutable:\n%s", v, paths.OdinBinLink)
 			}
 		case OpUpdate:
 			err = inst.Update(context.Background())
+
 			if errors.Is(err, odin.ErrUpToDate) {
 				installed := odin.CurrentVersion(runner)
 				text = fmt.Sprintf("Odin is already up to date.\n\nInstalled version: %s", installed)
@@ -194,32 +207,35 @@ func (m *model) runOperation() tea.Cmd {
 			}
 		case OpUninstall:
 			err = inst.Uninstall()
+
 			if err == nil {
 				text = "Odin has been uninstalled.\n\nThe managed installation under /opt/odin was removed."
 			}
 		case OpStatus:
 			st, serr := inst.Status(context.Background())
+
 			if serr != nil {
 				err = serr
 			} else {
 				text = odin.FormatStatus(st)
 			}
 		}
+
 		return opDoneMsg{text: text, err: err}
 	}
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	switch msg := msg.(type) {
 
+	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+
 		if m.screen == screenMenu {
 			m.list.SetSize(minInt(msg.Width, 50), minInt(maxInt(msg.Height-6, 6), 12))
 		}
-
 	case tea.KeyMsg:
 		switch {
 		case m.screen == screenMenu:
@@ -232,6 +248,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.resetWork()
 				return m, nil
 			}
+
 			return m, tea.Quit
 		case m.screen == screenWork:
 			k := msg.String()
@@ -239,18 +256,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		}
-
 	case spinner.TickMsg:
 		m.spinner, cmd = m.spinner.Update(msg)
+
 		if m.screen != screenWork {
 			return m, nil
 		}
-		return m, cmd
 
+		return m, cmd
 	case eventMsg:
 		m.applyEvent(msg.ev)
-		return m, nil
 
+		return m, nil
 	case runPrivRequestMsg:
 		m.lastLabel = "Running: " + strings.Join(msg.argv, " ")
 		c := exec.Command(msg.argv[0], msg.argv[1:]...)
@@ -263,17 +280,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			msg.ch <- msg.err
 		}
 		return m, nil
-
 	case confirmRequestMsg:
 		m.confirm = &msg
 		m.confirmIndex = 0
 		m.screen = screenConfirm
+
 		return m, nil
 
 	case opDoneMsg:
 		m.screen = screenResult
 		m.resultText = msg.text
 		m.resultErr = msg.err
+
 		return m, nil
 	}
 
@@ -285,10 +303,12 @@ func (m *model) applyEvent(ev odin.Event) {
 	case odin.EventStep:
 		if m.lastLabel != "" {
 			m.steps = append(m.steps, m.lastLabel)
+
 			if len(m.steps) > 6 {
 				m.steps = m.steps[len(m.steps)-6:]
 			}
 		}
+
 		m.lastLabel = ev.Label
 		m.showProgress = false
 	case odin.EventProgress:
@@ -302,21 +322,26 @@ func (m *model) applyEvent(ev odin.Event) {
 func (m *model) updateMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	nl, cmd := m.list.Update(msg)
 	m.list = nl
+
 	switch msg.String() {
 	case "q", "esc", "ctrl+c":
 		return m, tea.Quit
 	case "enter", "ctrl+j":
 		sel, ok := m.list.SelectedItem().(menuItem)
+
 		if !ok {
 			return m, cmd
 		}
+
 		if sel.kind == OpExit {
 			return m, tea.Quit
 		}
+
 		m.op = sel.kind
 		m.backToMenu = true
 		m.resetWork()
 		m.screen = screenWork
+
 		return m, m.runOperation()
 	}
 	return m, cmd
@@ -360,6 +385,7 @@ func (m *model) resetWork() {
 func (m *model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+
 	return v
 }
 
@@ -367,6 +393,7 @@ func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
+
 	return b
 }
 
@@ -374,5 +401,6 @@ func maxInt(a, b int) int {
 	if a > b {
 		return a
 	}
+
 	return b
 }

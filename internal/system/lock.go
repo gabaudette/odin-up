@@ -17,17 +17,23 @@ type Lock struct {
 // process already holds the lock, ErrAnotherRunning is returned.
 func AcquireLock(path string) (*Lock, error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+
 	if err != nil {
 		return nil, err
 	}
+
 	_ = f.Chmod(0o644)
+
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		f.Close()
+
 		if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EACCES) {
 			return nil, ErrAnotherRunning
 		}
+
 		return nil, err
 	}
+
 	return &Lock{file: f}, nil
 }
 
@@ -37,5 +43,6 @@ func (l *Lock) Release() error {
 		return nil
 	}
 	_ = syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN)
+
 	return l.file.Close()
 }

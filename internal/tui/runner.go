@@ -24,12 +24,15 @@ func (r *ProgramRunner) IsRoot() bool {
 // errors carry the output.
 func (r *ProgramRunner) Output(name string, args ...string) (string, error) {
 	out, err := exec.Command(name, args...).CombinedOutput()
+
 	if err != nil {
 		if len(out) > 0 {
 			return string(out), &ExecError{Err: err, Output: string(out)}
 		}
+
 		return "", err
 	}
+
 	return string(out), nil
 }
 
@@ -37,11 +40,14 @@ func (r *ProgramRunner) Output(name string, args ...string) (string, error) {
 // ExecProcess and waits for the result.
 func (r *ProgramRunner) RunPrivileged(name string, args ...string) error {
 	argv := append([]string{name}, args...)
+
 	if !r.IsRoot() {
 		argv = append([]string{"sudo"}, argv...)
 	}
+
 	ch := make(chan error, 1)
 	r.Prog.Send(runPrivRequestMsg{argv: argv, ch: ch})
+
 	return <-ch
 }
 
@@ -50,8 +56,10 @@ func (r *ProgramRunner) EnsurePrivileges() error {
 	if r.IsRoot() {
 		return nil
 	}
+
 	ch := make(chan error, 1)
 	r.Prog.Send(runPrivRequestMsg{argv: []string{"sudo", "-v"}, ch: ch})
+
 	return <-ch
 }
 
@@ -63,9 +71,11 @@ type ExecError struct {
 
 func (e *ExecError) Error() string {
 	out := strings.TrimSpace(e.Output)
+
 	if out == "" {
 		return e.Err.Error()
 	}
+
 	return e.Err.Error() + ": " + out
 }
 

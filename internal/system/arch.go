@@ -12,6 +12,7 @@ func CheckOS(goos string) error {
 	if goos != "linux" {
 		return fmt.Errorf("%s", ErrLinuxOnlyText)
 	}
+
 	return nil
 }
 
@@ -39,5 +40,6 @@ func TokenToName(token string) string {
 	case "arm64":
 		return "ARM64"
 	}
+
 	return token
 }
