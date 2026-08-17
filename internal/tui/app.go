@@ -116,6 +116,7 @@ func newModel(op OpKind) *model {
 			items = append(items, it)
 		}
 		m.list = list.New(items, list.NewDefaultDelegate(), 42, 9)
+		m.list.Title = "What would you like to do?"
 		m.list.SetShowStatusBar(false)
 		m.list.SetShowPagination(false)
 		m.list.SetShowHelp(false)
