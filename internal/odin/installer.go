@@ -111,7 +111,9 @@ func (in *Installer) Install(ctx context.Context) error {
 
 	in.step("Checking dependencies")
 	missing := system.MissingDependencies()
-	if len(missing) > 0 {
+	needsDeps := len(missing) > 0
+
+	if needsDeps {
 		if in.UI == nil {
 			return &MissingDepsError{Missing: missing}
 		}
@@ -125,7 +127,15 @@ func (in *Installer) Install(ctx context.Context) error {
 		if !ok {
 			return ErrCanceled
 		}
+	}
 
+	in.step("Requesting administrator privileges")
+
+	if err := in.Runner.EnsurePrivileges(); err != nil {
+		return err
+	}
+
+	if needsDeps {
 		in.step("Installing dependencies")
 
 		if err := system.InstallDependencies(in.Runner, missing); err != nil {
@@ -189,6 +199,12 @@ func (in *Installer) Update(ctx context.Context) error {
 	asset, err := release.SelectAsset(rel.Assets, arch)
 
 	if err != nil {
+		return err
+	}
+
+	in.step("Requesting administrator privileges")
+
+	if err := in.Runner.EnsurePrivileges(); err != nil {
 		return err
 	}
 
@@ -348,10 +364,6 @@ func (in *Installer) installRelease(ctx context.Context, asset *githubclient.Ass
 	in.step("Validating installation")
 
 	if _, err := validateInstall(in.Runner, candidate); err != nil {
-		return err
-	}
-
-	if err := in.Runner.EnsurePrivileges(); err != nil {
 		return err
 	}
 
