@@ -90,19 +90,13 @@ func InstallDependencies(runner Runner, missing []Dependency) error {
 		return ErrUnsupportedPackageManager()
 	}
 
-	var names []string
-	for _, d := range missing {
-		names = append(names, d.Package)
-	}
+	names := depNames(missing)
 
-	if err := runner.RunPrivileged("apt-get", "update"); err != nil {
-		return fmt.Errorf("failed to update package lists (apt-get update): %w", err)
-	}
+	// Run update and install as a single privileged invocation so the
+	// terminal only has to hand off to sudo once instead of twice.
+	script := "apt-get update && apt-get install -y --no-install-recommends " + strings.Join(names, " ")
 
-	args := []string{"install", "-y", "--no-install-recommends"}
-	args = append(args, names...)
-
-	if err := runner.RunPrivileged("apt-get", args...); err != nil {
+	if err := runner.RunPrivileged("sh", "-c", script); err != nil {
 		return fmt.Errorf("failed to install dependencies (%s): %w", strings.Join(names, " "), err)
 	}
 

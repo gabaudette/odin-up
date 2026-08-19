@@ -127,18 +127,19 @@ func (in *Installer) Install(ctx context.Context) error {
 		if !ok {
 			return ErrCanceled
 		}
-	}
 
-	in.step("Requesting administrator privileges")
-
-	if err := in.Runner.EnsurePrivileges(); err != nil {
-		return err
-	}
-
-	if needsDeps {
+		// Installing dependencies already runs a privileged command, which
+		// prompts for sudo on its own — an explicit EnsurePrivileges call
+		// here would just hand off to the terminal twice in a row.
 		in.step("Installing dependencies")
 
 		if err := system.InstallDependencies(in.Runner, missing); err != nil {
+			return err
+		}
+	} else {
+		in.step("Requesting administrator privileges")
+
+		if err := in.Runner.EnsurePrivileges(); err != nil {
 			return err
 		}
 	}

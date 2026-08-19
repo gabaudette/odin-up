@@ -13,7 +13,7 @@ import (
 	"odin-up/internal/tui"
 )
 
-const version = "0.1.1"
+const version = "0.1.2"
 
 const usage = `odin-up - install, update and manage the Odin compiler
 
